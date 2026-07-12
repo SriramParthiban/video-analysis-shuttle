@@ -3,7 +3,7 @@ import { display, text, mono } from "./fonts";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HANE 羽 — Badminton Match Analysis",
+  title: "YOSI — Badminton Analysis",
   description:
     "The coach's instrument. Upload a match, read each player's court coverage, workload, and weaknesses.",
 };
