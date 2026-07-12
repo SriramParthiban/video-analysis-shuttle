@@ -15,7 +15,7 @@ import ClipLedger from '@/components/hane/ClipLedger';
 import HaneMark from '@/components/hane/HaneMark';
 import { ArrowLeft } from '@/components/hane/icons';
 
-const CONTAINER = 'mx-auto w-full max-w-[1200px] px-5 md:px-[72px]';
+const CONTAINER = 'mx-auto w-full max-w-300 px-5 md:px-18';
 
 type PM = {
   label: string;
@@ -135,7 +135,7 @@ export function ReportPreview() {
           <p className="type-body-sm mt-2 max-w-[52ch] text-ink-d-600">
             The whole match on one court — each player&rsquo;s coverage heat and movement fingerprint.
           </p>
-          <div className="mx-auto mt-8 w-full max-w-[420px] md:max-w-[480px]">
+          <div className="mx-auto mt-8 w-full max-w-105 md:max-w-120">
             <MatchMap players={matchPlayers} />
           </div>
         </div>
@@ -215,7 +215,7 @@ export function DashboardPreview() {
           </>
         }
       />
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 py-8 md:px-[72px] md:py-12">
+      <main className="mx-auto w-full max-w-300 flex-1 px-5 py-8 md:px-18 md:py-12">
         <UploadCourt onPick={() => {}} uploading={false} message="" disabled={false} />
         <div className="type-micro mt-5 flex flex-wrap items-center gap-x-6 gap-y-1 text-ink-400">
           <span>CLIPS <span className="tnum text-ink-900">{pad2(counts.total)}</span></span>

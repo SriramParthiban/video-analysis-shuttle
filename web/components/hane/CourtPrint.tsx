@@ -262,7 +262,7 @@ export default function CourtPrint({
       {/* baseline lateral weight bar + L · R readout — below the court */}
       {hasLateral && (
         <div className="mt-2">
-          <div className="relative h-[2px] w-full bg-line">
+          <div className="relative h-0.5 w-full bg-line">
             <div
               className="absolute inset-y-0 left-0 bg-volt"
               style={{ width: `${leftFracPct}%` }}

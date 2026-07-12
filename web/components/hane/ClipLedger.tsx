@@ -91,7 +91,7 @@ export default function ClipLedger({ videos, loading = false }: Props) {
               <span className="type-micro ml-1.5 tnum text-ink-400">{pad2(counts[t])}</span>
               <span
                 aria-hidden
-                className={`absolute -bottom-px left-0 h-[2px] w-full origin-left bg-volt transition-transform duration-200 ${
+                className={`absolute -bottom-px left-0 h-0.5 w-full origin-left bg-volt transition-transform duration-200 ${
                   on ? "scale-x-100" : "scale-x-0"
                 }`}
               />
@@ -138,14 +138,14 @@ export default function ClipLedger({ videos, loading = false }: Props) {
             <li key={v.id}>
               <Link
                 href={`/analysis/${v.id}`}
-                className={`group relative ${COLS} min-h-[48px] border-b border-line py-2.5 transition-colors hover:bg-paper-sunk ${
+                className={`group relative ${COLS} min-h-12 border-b border-line py-2.5 transition-colors hover:bg-paper-sunk ${
                   i % 2 === 1 ? "bg-paper-sunk" : ""
                 }`}
               >
                 {/* volt edge-bar on hover — the "row advances in place" affordance */}
                 <span
                   aria-hidden
-                  className="absolute left-0 top-0 h-full w-[2px] origin-top scale-y-0 bg-volt transition-transform duration-200 group-hover:scale-y-100"
+                  className="absolute left-0 top-0 h-full w-0.5 origin-top scale-y-0 bg-volt transition-transform duration-200 group-hover:scale-y-100"
                 />
                 <span className="type-data tnum text-ink-400">{pad2(i + 1)}</span>
                 <span className="type-body-sm min-w-0 truncate text-ink-900">

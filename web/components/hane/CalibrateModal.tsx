@@ -44,7 +44,7 @@ export default function CalibrateModal({ imageUrl, initial, onSave, onClose }: P
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-sumi/95 p-4 md:p-8">
       {/* header — three-beat */}
-      <div className="mx-auto w-full max-w-[900px]">
+      <div className="mx-auto w-full max-w-225">
         <div className="type-kicker text-volt">Calibrate court</div>
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
           <h2 className="type-h1 text-ink-d-900">
@@ -124,7 +124,7 @@ export default function CalibrateModal({ imageUrl, initial, onSave, onClose }: P
       </div>
 
       {/* actions */}
-      <div className="mx-auto flex w-full max-w-[900px] flex-wrap items-center justify-end gap-3">
+      <div className="mx-auto flex w-full max-w-225 flex-wrap items-center justify-end gap-3">
         <Button as="button" variant="quiet" onClick={() => setPts([])}>
           Reset
         </Button>

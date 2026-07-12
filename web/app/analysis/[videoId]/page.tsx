@@ -57,7 +57,7 @@ type VideoRow = {
   created_at: string | null;
 };
 
-const CONTAINER = 'mx-auto w-full max-w-[1200px] px-5 md:px-[72px]';
+const CONTAINER = 'mx-auto w-full max-w-300 px-5 md:px-18';
 
 export default function AnalysisPage() {
   const { videoId } = useParams<{ videoId: string }>();
@@ -275,7 +275,7 @@ export default function AnalysisPage() {
                   The whole match on one court — each player&rsquo;s coverage heat and
                   movement fingerprint.
                 </p>
-                <div className="mx-auto mt-8 w-full max-w-[420px] md:max-w-[480px]">
+                <div className="mx-auto mt-8 w-full max-w-105 md:max-w-120">
                   <MatchMap players={matchPlayers} />
                 </div>
               </div>

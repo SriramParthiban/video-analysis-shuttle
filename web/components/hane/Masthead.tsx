@@ -19,7 +19,7 @@ export default function Masthead({ variant = "paper", right, className = "" }: P
 
   return (
     <header className={`w-full border-b ${surface} ${className}`}>
-      <div className="flex h-16 w-full items-center justify-between gap-6 px-5 md:px-[72px]">
+      <div className="flex h-16 w-full items-center justify-between gap-6 px-5 md:px-18">
         <HaneMark variant={variant} size={20} />
         {right != null && (
           <div className={`type-micro flex items-center gap-4 text-right ${rightInk}`}>{right}</div>

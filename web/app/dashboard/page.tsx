@@ -132,7 +132,7 @@ export default function Dashboard() {
     return (
       <>
         <Masthead variant="paper" />
-        <main className="mx-auto w-full max-w-[680px] flex-1 px-5 py-16 md:px-8">
+        <main className="mx-auto w-full max-w-170 flex-1 px-5 py-16 md:px-8">
           <div className="type-kicker text-weak-deep">SESSION NOT STARTED</div>
           <h1 className="type-h1 mt-3 text-ink-900">Anonymous sign-in is off</h1>
           <div className="mt-4 rounded-sm border-l-2 border-weak bg-paper-raised px-5 py-4">
@@ -163,7 +163,7 @@ export default function Dashboard() {
         }
       />
 
-      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 py-8 md:px-[72px] md:py-12">
+      <main className="mx-auto w-full max-w-300 flex-1 px-5 py-8 md:px-18 md:py-12">
         {/* the hidden input — the ONE upload entry point; onFile flow unchanged */}
         <input ref={fileInput} type="file" accept="video/*" className="hidden" onChange={onFile} />
 

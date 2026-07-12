@@ -79,7 +79,7 @@ export default function RallyLoader({ label }: Props) {
               "linear-gradient(to bottom, var(--color-volt-glow), transparent 44px)",
           }}
         >
-          <div className="h-[2px] w-full bg-volt" />
+          <div className="h-0.5 w-full bg-volt" />
         </div>
 
         {/* shuttle flying a parabolic clear along an offset-path */}
