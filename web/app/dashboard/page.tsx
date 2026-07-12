@@ -1,23 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { compressVideo } from '@/lib/compressVideo';
+import Masthead from '@/components/hane/Masthead';
+import SectionHeader from '@/components/hane/SectionHeader';
+import UploadCourt from '@/components/hane/UploadCourt';
+import ClipLedger from '@/components/hane/ClipLedger';
 
 type VideoRow = {
   id: string;
   original_filename: string | null;
   status: string;
   created_at: string;
-};
-
-const statusStyle: Record<string, string> = {
-  uploaded: 'bg-amber-500/20 text-amber-300',
-  queued: 'bg-amber-500/20 text-amber-300',
-  processing: 'bg-blue-500/20 text-blue-300',
-  done: 'bg-green-500/20 text-green-300',
-  failed: 'bg-red-500/20 text-red-300',
 };
 
 export default function Dashboard() {
@@ -119,72 +114,83 @@ export default function Dashboard() {
     }
   }
 
+  // Presentational-only: opens the SAME hidden input; derived telemetry readouts.
+  const onPick = useCallback(() => fileInput.current?.click(), []);
+  const counts = useMemo(
+    () => ({
+      total: videos.length,
+      processing: videos.filter((v) =>
+        v.status === 'uploaded' || v.status === 'queued' || v.status === 'processing',
+      ).length,
+      done: videos.filter((v) => v.status === 'done').length,
+    }),
+    [videos],
+  );
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+
   if (authError) {
     return (
-      <main className="mx-auto w-full max-w-md flex-1 p-6 text-center">
-        <div className="mt-16 text-5xl">🏸</div>
-        <h1 className="mt-3 text-xl font-bold">Almost there</h1>
-        <p className="mt-3 text-sm text-amber-400">{authError}</p>
-        <p className="mt-4 text-sm text-zinc-400">
-          Enable it in Supabase → <b>Authentication → Sign In / Providers</b> →
-          turn on <b>Allow anonymous sign-ins</b>, then reload this page.
-        </p>
-      </main>
+      <>
+        <Masthead variant="paper" />
+        <main className="mx-auto w-full max-w-[680px] flex-1 px-5 py-16 md:px-8">
+          <div className="type-kicker text-weak-deep">SESSION NOT STARTED</div>
+          <h1 className="type-h1 mt-3 text-ink-900">Anonymous sign-in is off</h1>
+          <div className="mt-4 rounded-sm border-l-2 border-weak bg-paper-raised px-5 py-4">
+            <p className="type-body-sm text-weak-deep">{authError}</p>
+          </div>
+          <p className="type-body-sm mt-5 text-ink-600">
+            Enable it in Supabase → <b className="text-ink-900">Authentication → Sign In / Providers</b> →
+            turn on <b className="text-ink-900">Allow anonymous sign-ins</b>, then reload this page.
+          </p>
+        </main>
+      </>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 p-5">
-      <header className="mb-6 flex items-center gap-2">
-        <span className="text-2xl">🏸</span>
-        <h1 className="text-xl font-bold">Match Analysis</h1>
-      </header>
-
-      <input
-        ref={fileInput}
-        type="file"
-        accept="video/*"
-        className="hidden"
-        onChange={onFile}
-      />
-      <button
-        onClick={() => fileInput.current?.click()}
-        disabled={uploading || !userId}
-        className="mb-2 w-full rounded-xl bg-blue-600 p-4 font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-      >
-        {uploading ? 'Uploading…' : '+ Upload a match clip'}
-      </button>
-      {uploadMsg && <p className="mb-4 text-center text-sm text-zinc-400">{uploadMsg}</p>}
-
-      <div className="mt-4 space-y-3">
-        {loading && <p className="text-center text-zinc-500">Loading…</p>}
-        {!loading && videos.length === 0 && (
-          <p className="py-10 text-center text-zinc-500">
-            No clips yet. Upload a match to get started.
-          </p>
-        )}
-        {videos.map((v) => (
-          <Link
-            key={v.id}
-            href={`/analysis/${v.id}`}
-            className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-600"
-          >
-            <div className="min-w-0">
-              <p className="truncate font-medium">{v.original_filename ?? 'Untitled clip'}</p>
-              <p className="text-xs text-zinc-500">
-                {new Date(v.created_at).toLocaleString()}
-              </p>
-            </div>
-            <span
-              className={`ml-3 shrink-0 rounded-full px-3 py-1 text-xs font-semibold capitalize ${
-                statusStyle[v.status] ?? 'bg-zinc-700 text-zinc-300'
-              }`}
-            >
-              {v.status}
+    <>
+      <Masthead
+        variant="paper"
+        right={
+          <>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className={`h-1.5 w-1.5 ${userId ? 'bg-volt' : 'bg-line'}`} />
+              {userId ? 'LIVE' : 'OFFLINE'}
             </span>
-          </Link>
-        ))}
-      </div>
-    </main>
+            <span aria-hidden className="h-3 w-px bg-line" />
+            <span>SESSION {userId ? userId.slice(0, 8).toUpperCase() : '—'}</span>
+          </>
+        }
+      />
+
+      <main className="mx-auto w-full max-w-[1200px] flex-1 px-5 py-8 md:px-[72px] md:py-12">
+        {/* the hidden input — the ONE upload entry point; onFile flow unchanged */}
+        <input ref={fileInput} type="file" accept="video/*" className="hidden" onChange={onFile} />
+
+        <UploadCourt onPick={onPick} uploading={uploading} message={uploadMsg} disabled={!userId} />
+
+        {/* optional mono account readouts (derived from existing videos state) */}
+        <div className="type-micro mt-5 flex flex-wrap items-center gap-x-6 gap-y-1 text-ink-400">
+          <span>
+            CLIPS <span className="tnum text-ink-900">{pad2(counts.total)}</span>
+          </span>
+          <span aria-hidden className="h-3 w-px bg-line" />
+          <span>
+            PROCESSING <span className="tnum text-ink-900">{pad2(counts.processing)}</span>
+          </span>
+          <span aria-hidden className="h-3 w-px bg-line" />
+          <span>
+            DONE <span className="tnum text-ink-900">{pad2(counts.done)}</span>
+          </span>
+        </div>
+
+        <div className="mt-16">
+          <SectionHeader kicker="INSTRUMENT BAY" title="Clip Ledger" count={videos.length} />
+          <div className="mt-5">
+            <ClipLedger videos={videos} loading={loading} />
+          </div>
+        </div>
+      </main>
+    </>
   );
 }

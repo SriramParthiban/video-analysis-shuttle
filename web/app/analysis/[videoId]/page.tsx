@@ -4,6 +4,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import HaneMark from '@/components/hane/HaneMark';
+import SectionHeader from '@/components/hane/SectionHeader';
+import CoachSummary from '@/components/hane/CoachSummary';
+import CalibrationStrip from '@/components/hane/CalibrationStrip';
+import CalibrateModal from '@/components/hane/CalibrateModal';
+import PlayerPlate from '@/components/hane/PlayerPlate';
+import FindingRow from '@/components/hane/FindingRow';
+import FailedState from '@/components/hane/FailedState';
+import Lightbox from '@/components/hane/Lightbox';
+import RallyLoader from '@/components/hane/RallyLoader';
+import MatchMap, { type MatchPlayer } from '@/components/hane/MatchMap';
+import { ArrowLeft } from '@/components/hane/icons';
 
 type PlayerMetrics = {
   label?: string;
@@ -12,6 +24,11 @@ type PlayerMetrics = {
   workload?: string;
   thumb_path?: string;
   court_coverage_pct?: { front: number; mid: number; rear: number };
+  // The worker also emits these two; the previous type omitted them. Read them
+  // optionally and feed CourtPrint (lateral weight bar + tramline distance),
+  // degrading gracefully when absent.
+  lateral_balance_pct?: { left: number; right: number };
+  total_distance_m?: number;
 };
 
 type Analysis = {
@@ -28,7 +45,19 @@ type Finding = {
   kind: string;
   title: string;
   detail: string | null;
+  // severity is the query's existing sort key; surfaced here so the SeverityGauge
+  // (brief-required on every FindingRow) can render its filled-tick count.
+  severity: number | null;
 };
+
+type VideoRow = {
+  court_corners: number[][] | null;
+  original_filename: string | null;
+  duration_seconds: number | null;
+  created_at: string | null;
+};
+
+const CONTAINER = 'mx-auto w-full max-w-[1200px] px-5 md:px-[72px]';
 
 export default function AnalysisPage() {
   const { videoId } = useParams<{ videoId: string }>();
@@ -40,7 +69,7 @@ export default function AnalysisPage() {
   const [names, setNames] = useState<Record<string, string>>({});
   const [thumbUrls, setThumbUrls] = useState<Record<string, string>>({});
   const [zoom, setZoom] = useState<string | null>(null);
-  const [videoRow, setVideoRow] = useState<{ court_corners: number[][] | null } | null>(null);
+  const [videoRow, setVideoRow] = useState<VideoRow | null>(null);
   const [refFrameUrl, setRefFrameUrl] = useState<string | null>(null);
   const [showCalibrator, setShowCalibrator] = useState(false);
   const initedFor = useRef<string | null>(null);
@@ -48,11 +77,16 @@ export default function AnalysisPage() {
   const fetchAll = useCallback(async () => {
     const { data: video } = await supabase
       .from('videos')
-      .select('status, reference_frame_path, court_corners')
+      .select('status, reference_frame_path, court_corners, original_filename, duration_seconds, created_at')
       .eq('id', videoId).single();
     if (video) {
       setVideoStatus(video.status);
-      setVideoRow({ court_corners: (video.court_corners as number[][] | null) ?? null });
+      setVideoRow({
+        court_corners: (video.court_corners as number[][] | null) ?? null,
+        original_filename: (video.original_filename as string | null) ?? null,
+        duration_seconds: (video.duration_seconds as number | null) ?? null,
+        created_at: (video.created_at as string | null) ?? null,
+      });
       if (video.reference_frame_path) {
         const { data: s } = await supabase.storage
           .from('videos').createSignedUrl(video.reference_frame_path as string, 3600);
@@ -72,7 +106,7 @@ export default function AnalysisPage() {
     if (a) {
       const { data: f } = await supabase
         .from('findings')
-        .select('id, category, kind, title, detail')
+        .select('id, category, kind, title, detail, severity')
         .eq('analysis_id', a.id)
         .order('severity', { ascending: false });
       setFindings((f as Finding[]) ?? []);
@@ -147,59 +181,121 @@ export default function AnalysisPage() {
     setShowCalibrator(false);
   }
 
+  // Re-queue a failed clip via the app's existing re-analysis idiom (status →
+  // 'uploaded', exactly as saveCorners does). The realtime videos subscription
+  // then flips the view back into the RallyLoader state.
+  async function retry() {
+    await supabase.from('videos').update({ status: 'uploaded' }).eq('id', videoId);
+  }
+
   const inProgress =
     ['uploaded', 'queued', 'processing'].includes(videoStatus) ||
     analysis?.status === 'processing';
 
+  const calibrated = Boolean(analysis?.metrics?.court_calibrated);
+  const clipName = videoRow?.original_filename ?? 'Untitled clip';
+
+  const dateStr = videoRow?.created_at
+    ? new Date(videoRow.created_at)
+        .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        .toUpperCase()
+    : '';
+  const durationStr = fmtDuration(videoRow?.duration_seconds);
+  const playersStr = playerEntries.length
+    ? `${playerEntries.length} PLAYER${playerEntries.length === 1 ? '' : 'S'}`
+    : '';
+  const headMeta = [dateStr, durationStr, playersStr].filter(Boolean).join('   ·   ');
+  const verdictMeta = [playersStr, durationStr, dateStr].filter(Boolean).join('   ·   ');
+
+  const matchPlayers: MatchPlayer[] = playerEntries.slice(0, 2).map(([key, m]) => ({
+    side: m.side ?? key,
+    coverage: m.court_coverage_pct ?? { front: 0, mid: 0, rear: 0 },
+    lateral: m.lateral_balance_pct,
+    distanceM: m.total_distance_m,
+    label: nameFor(key, m.label),
+  }));
+
   return (
-    <main className="mx-auto w-full max-w-2xl flex-1 p-5">
-      <Link href="/dashboard" className="text-sm text-blue-400 hover:underline">← Back</Link>
+    <main className="flex-1 pb-24">
+      {/* top bar — back to the ledger + wordmark */}
+      <div className={`${CONTAINER} flex items-center justify-between border-b border-line py-4`}>
+        <Link
+          href="/dashboard"
+          className="type-kicker inline-flex items-center gap-2 text-ink-600 transition-colors hover:text-ink-900"
+        >
+          <ArrowLeft size={15} aria-hidden />
+          Back
+        </Link>
+        <HaneMark size={20} />
+      </div>
 
       {loading ? (
-        <p className="mt-10 text-center text-zinc-500">Loading…</p>
+        <RallyLoader label="LOADING · READING REPORT" />
       ) : inProgress || !analysis ? (
-        <div className="mt-16 text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-zinc-700 border-t-blue-500" />
-          <p className="mt-4 font-semibold">Analyzing match…</p>
-          <p className="mt-1 text-sm text-zinc-500">Detecting players and reading their movement. Updates live.</p>
-        </div>
+        <RallyLoader />
       ) : analysis.status === 'failed' ? (
-        <p className="mt-16 text-center font-semibold text-red-400">
-          Analysis failed — check the worker logs and try re-uploading.
-        </p>
+        <div className={`${CONTAINER} pt-12`}>
+          <FailedState onRetry={retry} />
+        </div>
       ) : (
-        <div className="mt-4 space-y-6">
-          <div className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-            <span className="text-xs">
-              {analysis.metrics?.court_calibrated ? (
-                <span className="text-green-400">✓ Court-calibrated — zones &amp; left/right are accurate</span>
-              ) : (
-                <span className="text-amber-400">⚠ Not calibrated — mark the court for accurate stats</span>
-              )}
-            </span>
-            {refFrameUrl && (
-              <button
-                onClick={() => setShowCalibrator(true)}
-                className="shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500"
-              >
-                📐 {videoRow?.court_corners ? 'Re-calibrate' : 'Calibrate court'}
-              </button>
-            )}
+        <>
+          {/* 1 — report masthead strip */}
+          <header className={`${CONTAINER} pt-12 pb-8`}>
+            <div className="type-kicker text-ink-400">Match report</div>
+            <h1 className="type-display-l mt-3 wrap-anywhere text-ink-900">
+              {clipName}
+            </h1>
+            {headMeta && <div className="type-micro mt-4 text-ink-400">{headMeta}</div>}
+          </header>
+
+          {/* 2 — calibration strip */}
+          <div className={CONTAINER}>
+            <CalibrationStrip
+              calibrated={calibrated}
+              onCalibrate={() => setShowCalibrator(true)}
+              show={Boolean(refFrameUrl)}
+            />
           </div>
 
-          <Section title="Coach summary">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 leading-relaxed">
-              {analysis.summary ? rewrite(analysis.summary) : 'No summary produced.'}
-            </div>
-          </Section>
+          {/* 3 — the verdict pull-quote */}
+          <section className={`${CONTAINER} pt-12`}>
+            <div className="type-kicker mb-5 text-ink-400">Coach&rsquo;s verdict</div>
+            <CoachSummary
+              text={analysis.summary ? rewrite(analysis.summary) : 'No summary produced.'}
+              meta={verdictMeta || undefined}
+            />
+          </section>
 
+          {/* 4 — full-bleed SUMI match-map band (the screenshot payoff) */}
+          {matchPlayers.length > 0 && (
+            <section className="grain-sumi mt-16 bg-sumi py-14 md:py-20">
+              <div className={CONTAINER}>
+                <div className="type-kicker text-volt">Match map</div>
+                <p className="type-body-sm mt-2 max-w-[52ch] text-ink-d-600">
+                  The whole match on one court — each player&rsquo;s coverage heat and
+                  movement fingerprint.
+                </p>
+                <div className="mx-auto mt-8 w-full max-w-[420px] md:max-w-[480px]">
+                  <MatchMap players={matchPlayers} />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* 5 — player plates (2-up desktop / 1-up phone) */}
           {playerEntries.length > 0 && (
-            <Section title="Players — tap a name to identify them">
-              <div className="space-y-3">
+            <section className={`${CONTAINER} pt-16`}>
+              <SectionHeader kicker="On court" title="Players" count={playerEntries.length} />
+              <p className="type-body-sm mt-3 text-ink-400">
+                Tap a name to identify each athlete — it threads through the whole report.
+              </p>
+              <div className="mt-8 grid gap-6 md:grid-cols-2">
                 {playerEntries.map(([key, m]) => (
-                  <PlayerCard
+                  <PlayerPlate
                     key={key}
                     m={m}
+                    playerKey={key}
+                    displayName={nameFor(key, m.label)}
                     photo={m.thumb_path ? thumbUrls[m.thumb_path] : undefined}
                     value={names[key] ?? ''}
                     placeholder={m.label ?? 'Player'}
@@ -209,45 +305,37 @@ export default function AnalysisPage() {
                   />
                 ))}
               </div>
-            </Section>
+            </section>
           )}
 
-          <Section title="What to work on">
-            <div className="space-y-3">
-              {findings.map((f) => (
-                <div key={f.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold">{rewrite(f.title)}</p>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
-                      f.kind === 'strength' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
-                    }`}>{f.kind}</span>
-                  </div>
-                  {f.detail && (
-                    <p className="mt-2 text-sm leading-relaxed text-zinc-300">{rewrite(f.detail)}</p>
-                  )}
-                </div>
-              ))}
-              {findings.length === 0 && (
-                <p className="text-sm text-zinc-500">No specific findings recorded.</p>
-              )}
-            </div>
-          </Section>
-        </div>
+          {/* 6 — what to work on (findings, severity-desc from the query) */}
+          <section className={`${CONTAINER} pt-16`}>
+            <SectionHeader kicker="Coaching focus" title="What to work on" count={findings.length} />
+            {findings.length > 0 ? (
+              <div className="mt-6 border-b border-line">
+                {findings.map((f, i) => (
+                  <FindingRow
+                    key={f.id}
+                    index={i + 1}
+                    kind={f.kind}
+                    category={f.category}
+                    severity={f.severity ?? 3}
+                    title={rewrite(f.title)}
+                    detail={f.detail ? rewrite(f.detail) : null}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="type-body mt-6 text-ink-400">No specific findings recorded.</p>
+            )}
+          </section>
+        </>
       )}
 
-      {zoom && (
-        <div
-          onClick={() => setZoom(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoom} alt="player" className="max-h-[85vh] max-w-full rounded-lg object-contain" />
-          <span className="absolute bottom-6 text-xs text-zinc-400">tap anywhere to close</span>
-        </div>
-      )}
+      {zoom && <Lightbox src={zoom} onClose={() => setZoom(null)} />}
 
       {showCalibrator && refFrameUrl && (
-        <CourtCalibrator
+        <CalibrateModal
           imageUrl={refFrameUrl}
           initial={videoRow?.court_corners ?? null}
           onSave={saveCorners}
@@ -258,147 +346,10 @@ export default function AnalysisPage() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <h2 className="mb-2 text-xs font-bold tracking-widest text-zinc-500">{title.toUpperCase()}</h2>
-      {children}
-    </section>
-  );
-}
-
-const sideLabel: Record<string, string> = { bottom: 'Bottom side', top: 'Top side' };
-
-function PlayerCard({
-  m, photo, value, placeholder, onChange, onBlur, onExpand,
-}: {
-  m: PlayerMetrics;
-  photo?: string;
-  value: string;
-  placeholder: string;
-  onChange: (v: string) => void;
-  onBlur: (v: string) => void;
-  onExpand: (url: string) => void;
-}) {
-  const cov = m.court_coverage_pct ?? { front: 0, mid: 0, rear: 0 };
-  return (
-    <div className="flex gap-3 rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-      {photo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={photo}
-          alt="player"
-          onClick={() => onExpand(photo)}
-          className="h-24 w-16 shrink-0 cursor-pointer rounded-lg object-cover transition hover:opacity-80"
-          title="Tap to enlarge"
-        />
-      ) : (
-        <div className="flex h-24 w-16 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-2xl">🏸</div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="mb-2 flex items-center gap-2">
-          <input
-            className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm font-semibold outline-none focus:border-blue-500"
-            placeholder={`Name this player (${placeholder})`}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onBlur={(e) => onBlur(e.target.value)}
-          />
-          <span className="shrink-0 rounded-full bg-blue-500/20 px-2 py-0.5 text-[11px] font-medium text-blue-300">
-            {m.role ?? 'Player'}
-          </span>
-        </div>
-        <p className="mb-1 text-[11px] text-zinc-500">
-          {sideLabel[m.side ?? ''] ?? ''} · running: <span className="capitalize">{m.workload ?? '—'}</span>
-        </p>
-        <div className="space-y-1">
-          <Bar label="Net" pct={cov.front} color="bg-sky-500" />
-          <Bar label="Mid" pct={cov.mid} color="bg-zinc-500" />
-          <Bar label="Back" pct={cov.rear} color="bg-amber-500" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Bar({ label, pct, color }: { label: string; pct: number; color: string }) {
-  return (
-    <div className="flex items-center gap-2 text-[11px]">
-      <span className="w-8 text-zinc-400">{label}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-zinc-800">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-      </div>
-      <span className="w-8 text-right text-zinc-300">{pct}%</span>
-    </div>
-  );
-}
-
-const CORNER_STEPS = ['NEAR-LEFT', 'NEAR-RIGHT', 'FAR-RIGHT', 'FAR-LEFT'];
-
-function CourtCalibrator({
-  imageUrl, initial, onSave, onClose,
-}: {
-  imageUrl: string;
-  initial: number[][] | null;
-  onSave: (corners: number[][]) => void;
-  onClose: () => void;
-}) {
-  const [pts, setPts] = useState<number[][]>(
-    initial && initial.length === 4 ? initial : [],
-  );
-
-  function onImgClick(e: React.MouseEvent<HTMLImageElement>) {
-    if (pts.length >= 4) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    setPts([...pts, [x, y]]);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/95 p-4">
-      <div className="mb-2 text-center">
-        <p className="font-semibold">Mark the 4 court corners</p>
-        <p className="text-sm text-amber-300">
-          {pts.length < 4
-            ? `Tap the ${CORNER_STEPS[pts.length]} corner`
-            : 'All 4 set — save to re-analyze'}
-        </p>
-        <p className="text-[11px] text-zinc-500">
-          Order: near-left → near-right → far-right → far-left (the outer court lines)
-        </p>
-      </div>
-      <div className="flex flex-1 items-center justify-center overflow-hidden">
-        <div className="relative">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={imageUrl}
-            alt="court"
-            onClick={onImgClick}
-            className="max-h-[68vh] max-w-full cursor-crosshair rounded-lg object-contain"
-          />
-          {pts.map((p, i) => (
-            <div
-              key={i}
-              className="pointer-events-none absolute flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white ring-2 ring-white"
-              style={{ left: `${p[0] * 100}%`, top: `${p[1] * 100}%` }}
-            >
-              {i + 1}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-4 flex items-center justify-center gap-3">
-        <button onClick={() => setPts([])} className="rounded-lg border border-zinc-600 px-4 py-2 text-sm">Reset</button>
-        <button onClick={onClose} className="rounded-lg border border-zinc-600 px-4 py-2 text-sm">Cancel</button>
-        <button
-          disabled={pts.length !== 4}
-          onClick={() => onSave(pts)}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-        >
-          Save &amp; re-analyze
-        </button>
-      </div>
-    </div>
-  );
+function fmtDuration(seconds?: number | null): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds <= 0) return '';
+  const s = Math.round(seconds);
+  const m = Math.floor(s / 60);
+  const rem = String(s % 60).padStart(2, '0');
+  return `${m}:${rem}`;
 }

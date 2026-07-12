@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import HaneMark from '@/components/hane/HaneMark';
+import ShuttleArc from '@/components/hane/ShuttleArc';
+import Field from '@/components/hane/Field';
+import Button from '@/components/hane/Button';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -48,61 +52,137 @@ export default function LoginPage() {
     }
   }
 
+  // Presentation-only derivation from the existing `msg` — the confirm-email
+  // note is informational; anything else is an auth error (vermilion).
+  const isConfirmNote = !!msg && msg.startsWith('Account created.');
+  const authError = msg && !isConfirmNote ? msg : undefined;
+
   return (
-    <main className="flex flex-1 items-center justify-center p-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="text-5xl">🏸</div>
-          <h1 className="mt-2 text-2xl font-bold">Badminton Analysis</h1>
-          <p className="text-zinc-400">
-            {mode === 'signin' ? 'Coach sign in' : 'Create a coach account'}
-          </p>
+    <main className="grain-sumi flex min-h-dvh w-full flex-col bg-sumi text-ink-d-900 lg:flex-row">
+      {/* LEFT 2/3 — the "unboxing": wordmark, self-drawing court, manifesto */}
+      <section className="relative flex flex-col justify-between gap-12 border-b border-sumi-line bg-sumi px-6 py-10 sm:px-10 lg:w-2/3 lg:border-b-0 lg:border-r lg:px-16 lg:py-14">
+        <div className="flex items-start justify-between gap-6">
+          <HaneMark variant="sumi" size={44} />
+          <span className="type-kicker mt-2 hidden text-ink-d-400 sm:block">
+            Match Analysis
+          </span>
         </div>
 
-        <form onSubmit={submit} className="space-y-3">
-          {mode === 'signup' && (
-            <input
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none focus:border-blue-500"
-              placeholder="Full name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+        <div className="flex flex-1 items-center justify-center">
+          <ShuttleArc className="max-w-190" />
+        </div>
+
+        <div className="max-w-[54ch]">
+          <p className="type-kicker text-volt">The coach&rsquo;s instrument</p>
+          <p className="type-verdict mt-3 text-ink-d-900">
+            A shuttle leaves no wasted motion.{' '}
+            <span className="text-ink-d-600">
+              Neither does the instrument that reads it.
+            </span>
+          </p>
+        </div>
+      </section>
+
+      {/* RIGHT 1/3 — the form, on sumi-raised */}
+      <section className="flex flex-col justify-center bg-sumi-raised px-6 py-14 sm:px-10 lg:w-1/3 lg:px-14">
+        <div className="mx-auto w-full max-w-sm">
+          <p className="type-kicker text-ink-d-400">Coach access</p>
+
+          {/* signin / signup tab pair (mono) */}
+          <div className="mt-5 flex items-stretch gap-7">
+            {(['signin', 'signup'] as const).map((m) => {
+              const activeTab = mode === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={`type-kicker relative pb-2 outline-none transition-colors focus-visible:text-volt ${
+                    activeTab ? 'text-volt' : 'text-ink-d-600 hover:text-ink-d-900'
+                  }`}
+                >
+                  {m === 'signin' ? 'Sign in' : 'Sign up'}
+                  <span
+                    aria-hidden
+                    className={`absolute inset-x-0 bottom-0 h-0.5 origin-left bg-volt transition-transform duration-200 ease-out ${
+                      activeTab ? 'scale-x-100' : 'scale-x-0'
+                    }`}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          <form onSubmit={submit} className="mt-9 space-y-7">
+            {mode === 'signup' && (
+              <Field
+                variant="sumi"
+                label="Full name"
+                value={fullName}
+                onChange={setFullName}
+                autoComplete="name"
+              />
+            )}
+            <Field
+              variant="sumi"
+              label="Email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              value={email}
+              onChange={setEmail}
             />
+            <Field
+              variant="sumi"
+              label="Password"
+              type="password"
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={setPassword}
+              error={authError}
+            />
+
+            {/* solid volt CTA — scan shimmer while submitting */}
+            <div className="relative mt-2 overflow-hidden rounded-btn">
+              <Button
+                as="button"
+                type="submit"
+                variant="primary"
+                disabled={busy}
+                className="w-full"
+              >
+                {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
+              </Button>
+              {busy && (
+                <span
+                  aria-hidden
+                  className="anim-scan-sweep pointer-events-none absolute inset-x-0 top-0 h-full"
+                  style={{
+                    background:
+                      'linear-gradient(to bottom, rgba(24,23,18,0.20), transparent 45%)',
+                  }}
+                >
+                  <span
+                    className="block h-0.5 w-full"
+                    style={{ background: 'var(--color-volt-ink)', opacity: 0.35 }}
+                  />
+                </span>
+              )}
+            </div>
+          </form>
+
+          {/* confirm-email note (informational, not an error) */}
+          {isConfirmNote && (
+            <p className="type-micro mt-6 leading-relaxed text-volt">{msg}</p>
           )}
-          <input
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none focus:border-blue-500"
-            placeholder="Email"
-            type="email"
-            autoCapitalize="none"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-900 p-3 outline-none focus:border-blue-500"
-            placeholder="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="w-full rounded-lg bg-blue-600 p-3 font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-          >
-            {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Sign up'}
-          </button>
-        </form>
 
-        {msg && <p className="mt-4 text-center text-sm text-amber-400">{msg}</p>}
-
-        <button
-          onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-          className="mt-6 w-full text-center text-sm text-blue-400 hover:underline"
-        >
-          {mode === 'signin'
-            ? 'No account? Create one'
-            : 'Already have an account? Sign in'}
-        </button>
-      </div>
+          <p className="type-micro mt-10 leading-relaxed text-ink-d-400">
+            Protected session · Coach access only · By continuing you accept the
+            terms of use.
+          </p>
+        </div>
+      </section>
     </main>
   );
 }
