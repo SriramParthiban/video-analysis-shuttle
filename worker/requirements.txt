@@ -1,0 +1,5 @@
+# Stub worker (Phase 1) — runs on your current Python 3.14, no GPU needed.
+# These are lightweight, pure-Python-ish libs (no PyTorch here).
+supabase>=2.7.0
+anthropic>=0.40.0
+python-dotenv>=1.0.1

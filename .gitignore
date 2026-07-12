@@ -1,0 +1,35 @@
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+npm-debug.*
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-cv/
+venv/
+
+# Model weights (downloaded / trained — large)
+*.pt
+*.onnx
+
+# Training data & outputs (large)
+training/clips/
+training/dataset/
+training/runs/
+
+# Next.js build output (also covered by web/.gitignore)
+.next/
+
+# OS
+.DS_Store
+Thumbs.db

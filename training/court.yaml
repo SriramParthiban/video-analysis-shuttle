@@ -1,0 +1,12 @@
+# YOLOv8-pose dataset: the "court" object with 4 keypoints (the 4 corners).
+# Paths are relative to this file's folder.
+path: .
+train: dataset/images
+val: dataset/images      # TODO: hold out ~15% into a separate val set once you
+                         # have enough labels (edit these two paths).
+
+kpt_shape: [4, 3]        # 4 corners, each (x, y, visibility)
+flip_idx: [1, 0, 3, 2]   # horizontal flip swaps left<->right corners
+
+names:
+  0: court

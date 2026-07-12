@@ -1,0 +1,15 @@
+# Phase 2 — full CV worker stack. Install in a Python 3.12 venv (.venv-cv).
+#
+# STEP 1 — PyTorch for the RTX 5060 (Blackwell needs CUDA 12.8+):
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#
+# STEP 2 — everything else:
+#   pip install -r requirements-cv.txt
+ultralytics>=8.3.0        # YOLOv8 pose + tracking (ByteTrack)
+opencv-python>=4.10.0     # video decode
+numpy
+
+# same backend libs the worker uses
+supabase>=2.7.0
+anthropic>=0.40.0
+python-dotenv>=1.0.1
